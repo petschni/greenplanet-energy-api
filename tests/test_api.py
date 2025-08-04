@@ -2,6 +2,7 @@
 
 import pytest
 from aioresponses import aioresponses
+import aiohttp
 
 from greenplanet_energy_api import (
     GreenPlanetEnergyAPI,
@@ -74,15 +75,15 @@ class TestGreenPlanetEnergyAPI:
             for hour in range(24):
                 key = f"gpe_price_{hour:02d}"
                 assert key in prices
-                expected_price = 0.20 + (hour * 0.01)
-                assert prices[key] == expected_price
+                expected_price = round(0.20 + (hour * 0.01), 2)
+                assert abs(prices[key] - expected_price) < 0.001
 
             # Check tomorrow's prices
             for hour in range(24):
                 key = f"gpe_price_{hour:02d}_tomorrow"
                 assert key in prices
-                expected_price = 0.25 + (hour * 0.01)
-                assert prices[key] == expected_price
+                expected_price = round(0.25 + (hour * 0.01), 2)
+                assert abs(prices[key] - expected_price) < 0.001
 
     async def test_get_electricity_prices_api_error(self, mock_api_error_response):
         """Test API error handling."""
@@ -118,7 +119,7 @@ class TestGreenPlanetEnergyAPI:
         with aioresponses() as m:
             m.post(
                 "https://mein.green-planet-energy.de/p2",
-                exception=ConnectionError("Connection failed"),
+                exception=aiohttp.ClientError("Connection failed"),
             )
 
             async with GreenPlanetEnergyAPI() as api:
