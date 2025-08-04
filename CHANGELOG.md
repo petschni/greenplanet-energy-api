@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2025-08-04
+
+### Fixed
+- Fixed GitHub Actions workflow using deprecated release action
+- Updated to use maintained `softprops/action-gh-release@v2`
+- Improved release notes generation and formatting
+
+### Changed
+- Better PyPI version checking using JSON API instead of HTTP status codes
+- More robust version detection for automated publishing
+
 ## [0.1.1] - 2025-08-04
 
 ### Fixed
