@@ -133,9 +133,9 @@ jobs:
         
     - name: Create GitHub Release
       if: success()
-      uses: ncipollo/create-release@v1
+      uses: softprops/action-gh-release@v2
       with:
-        tag: v${{ needs.build.outputs.current_version }}
+        tag_name: v${{ needs.build.outputs.current_version }}
         name: Release v${{ needs.build.outputs.current_version }}
         body: |
           Automated release of greenplanet-energy-api v${{ needs.build.outputs.current_version }}
@@ -144,6 +144,9 @@ jobs:
           ```bash
           pip install greenplanet-energy-api==${{ needs.build.outputs.current_version }}
           ```
+          
+          ## What's Changed
+          See the [changelog](https://github.com/petschni/greenplanet-energy-api/blob/main/CHANGELOG.md) for detailed changes.
         draft: false
         prerelease: false
-        generateReleaseNotes: true
+        generate_release_notes: true
