@@ -26,7 +26,7 @@ class GreenPlanetEnergyAPI:
         timeout: int = 30,
     ) -> None:
         """Initialize the API client.
-        
+
         Args:
             session: Optional aiohttp session. If None, a new session will be created.
             timeout: Request timeout in seconds.
@@ -54,12 +54,12 @@ class GreenPlanetEnergyAPI:
 
     async def get_electricity_prices(self) -> dict[str, float]:
         """Fetch electricity prices for today and tomorrow.
-        
+
         Returns:
             Dictionary with price data:
             - gpe_price_XX: Today's hourly prices (XX = 00-23)
             - gpe_price_XX_tomorrow: Tomorrow's hourly prices (XX = 00-23)
-            
+
         Raises:
             GreenPlanetEnergyConnectionError: For network/connection issues
             GreenPlanetEnergyAPIError: For API-specific errors
@@ -106,7 +106,7 @@ class GreenPlanetEnergyAPI:
                     data = await response.json(content_type=None)
                     return self._process_response(data)
 
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
             raise GreenPlanetEnergyConnectionError(
                 "Timeout while communicating with API"
             ) from err
@@ -117,13 +117,13 @@ class GreenPlanetEnergyAPI:
 
     def _process_response(self, response_data: dict[str, Any]) -> dict[str, float]:
         """Process the API response and extract hourly prices.
-        
+
         Args:
             response_data: Raw API response data
-            
+
         Returns:
             Processed price data dictionary
-            
+
         Raises:
             GreenPlanetEnergyAPIError: For API-specific errors
         """

@@ -1,8 +1,8 @@
 """Tests for GreenPlanetEnergyAPI."""
 
+import aiohttp
 import pytest
 from aioresponses import aioresponses
-import aiohttp
 
 from greenplanet_energy_api import (
     GreenPlanetEnergyAPI,
