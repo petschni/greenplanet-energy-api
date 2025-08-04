@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2025-08-04
+
+### Fixed
+- Fixed linting issues with black and ruff
+- Updated pyproject.toml to use modern ruff configuration format
+- Improved GitHub Actions workflow
+
+### Added
+- Comprehensive local testing script (`run_all_checks.sh`)
+- Better documentation for development workflow
+
 ## [0.1.0] - 2025-08-04
 
 ### Added
