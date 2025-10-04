@@ -52,3 +52,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API reference documentation
 - Development setup instructions
 - Contributing guidelines
+
+## [0.1.4] - 2025-10-04
+
+### Added
+- `get_highest_price_today(data)`: Get highest electricity price for today
+- `get_lowest_price_day(data)`: Get lowest price during day hours (6-18) for today
+- `get_lowest_price_night(data)`: Get lowest price during night hours (18-6) for today/tonight
+- `get_current_price(data, hour)`: Get price for a specific hour
+- `get_highest_price_today_with_hour(data)`: Get highest price and hour
+- `get_lowest_price_day_with_hour(data)`: Get lowest day price and hour
+- `get_lowest_price_night_with_hour(data)`: Get lowest night price and hour
+
+### Note
+- Day period prices use only today's data (6:00-18:00)
+- Night period prices use today's evening (18:00-23:00) and tomorrow's early morning (00:00-05:00)
+

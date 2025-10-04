@@ -193,3 +193,158 @@ class GreenPlanetEnergyAPI:
 
         _LOGGER.debug("Processed electricity prices: %s", processed_data)
         return processed_data
+
+    def get_highest_price_today(self, data: dict[str, float]) -> float | None:
+        """Get the highest price for today.
+        
+        Args:
+            data: Price data dictionary with hourly prices
+            
+        Returns:
+            Highest price or None if no data available
+        """
+        if not data:
+            return None
+
+        today_prices = [
+            price for key, price in data.items()
+            if key.startswith("gpe_price_") and not key.endswith("_tomorrow") and price is not None
+        ]
+        
+        return max(today_prices) if today_prices else None
+
+    def get_lowest_price_day(self, data: dict[str, float]) -> float | None:
+        """Get the lowest price during day hours (6-18) for today.
+        
+        Args:
+            data: Price data dictionary with hourly prices
+            
+        Returns:
+            Lowest day price or None if no data available
+        """
+        if not data:
+            return None
+
+        prices = []
+        for hour in range(6, 18):  # Day period: 6:00 to 18:00
+            price_key = f"gpe_price_{hour:02d}"
+            if price_key in data:
+                price = data[price_key]
+                if price is not None:
+                    prices.append(price)
+
+        return min(prices) if prices else None
+
+    def get_lowest_price_night(self, data: dict[str, float]) -> float | None:
+        """Get the lowest price during night hours (18-6) for today/tonight.
+        
+        Args:
+            data: Price data dictionary with hourly prices
+            
+        Returns:
+            Lowest night price or None if no data available
+        """
+        if not data:
+            return None
+
+        prices = []
+        # Evening hours today (18-23)
+        for hour in range(18, 24):
+            price_key = f"gpe_price_{hour:02d}"
+            if price_key in data:
+                price = data[price_key]
+                if price is not None:
+                    prices.append(price)
+
+        # Early morning hours tomorrow (0-5)
+        for hour in range(6):
+            price_key = f"gpe_price_{hour:02d}_tomorrow"
+            if price_key in data:
+                price = data[price_key]
+                if price is not None:
+                    prices.append(price)
+
+        return min(prices) if prices else None
+
+    def get_current_price(self, data: dict[str, float], hour: int) -> float | None:
+        """Get the current price for the specified hour.
+        
+        Args:
+            data: Price data dictionary with hourly prices
+            hour: Current hour (0-23)
+            
+        Returns:
+            Current price or None if not available
+        """
+        if not data:
+            return None
+
+        price_key = f"gpe_price_{hour:02d}"
+        return data.get(price_key)
+
+    def get_highest_price_today_with_hour(self, data: dict[str, float]) -> tuple[float | None, int | None]:
+        """Get the highest price today and the hour when it occurs.
+        
+        Args:
+            data: Price data dictionary with hourly prices
+            
+        Returns:
+            Tuple of (highest_price, hour) or (None, None) if no data available
+        """
+        highest_price = self.get_highest_price_today(data)
+        if highest_price is None or not data:
+            return None, None
+        
+        for hour in range(24):
+            price_key = f"gpe_price_{hour:02d}"
+            if data.get(price_key) == highest_price:
+                return highest_price, hour
+        
+        return highest_price, None
+
+    def get_lowest_price_day_with_hour(self, data: dict[str, float]) -> tuple[float | None, int | None]:
+        """Get the lowest day price and the hour when it occurs.
+        
+        Args:
+            data: Price data dictionary with hourly prices
+            
+        Returns:
+            Tuple of (lowest_price, hour) or (None, None) if no data available
+        """
+        lowest_price = self.get_lowest_price_day(data)
+        if lowest_price is None or not data:
+            return None, None
+        
+        for hour in range(6, 18):  # Day period: 6:00 to 18:00
+            price_key = f"gpe_price_{hour:02d}"
+            if data.get(price_key) == lowest_price:
+                return lowest_price, hour
+        
+        return lowest_price, None
+
+    def get_lowest_price_night_with_hour(self, data: dict[str, float]) -> tuple[float | None, int | None]:
+        """Get the lowest night price and the hour when it occurs.
+        
+        Args:
+            data: Price data dictionary with hourly prices
+            
+        Returns:
+            Tuple of (lowest_price, hour) or (None, None) if no data available
+        """
+        lowest_price = self.get_lowest_price_night(data)
+        if lowest_price is None or not data:
+            return None, None
+        
+        # Check evening hours today (18-23)
+        for hour in range(18, 24):
+            price_key = f"gpe_price_{hour:02d}"
+            if data.get(price_key) == lowest_price:
+                return lowest_price, hour
+        
+        # Check early morning hours tomorrow (0-5)
+        for hour in range(6):
+            price_key = f"gpe_price_{hour:02d}_tomorrow"
+            if data.get(price_key) == lowest_price:
+                return lowest_price, hour
+        
+        return lowest_price, None
