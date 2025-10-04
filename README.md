@@ -12,7 +12,7 @@ This library is primarily designed for use with Home Assistant but can be used i
 
 - Async/await support
 - Fetch hourly electricity prices for today and tomorrow
-- Handles German decimal formatting 
+- Handles German decimal formatting
 - Comprehensive error handling
 - Type hints for better IDE support
 - Lightweight with minimal dependencies
@@ -33,13 +33,13 @@ async def main():
     async with GreenPlanetEnergyAPI() as api:
         # Get electricity prices for today and tomorrow
         prices = await api.get_electricity_prices()
-        
+
         # Access today's prices
         for hour in range(24):
             price_key = f"gpe_price_{hour:02d}"
             if price_key in prices:
                 print(f"Hour {hour:02d}: {prices[price_key]} €/kWh")
-        
+
         # Access tomorrow's prices
         for hour in range(24):
             price_key = f"gpe_price_{hour:02d}_tomorrow"

@@ -67,4 +67,3 @@ git push origin main
 - **Push fehlschlägt**: SSH Key Problem (siehe oben)
 - **PyPI Upload fehlschlägt**: Trusted Publishing nicht konfiguriert
 - **Tests fehlschlagen**: Dependencies installieren und lokal testen
-

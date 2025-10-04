@@ -67,4 +67,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Note
 - Day period prices use only today's data (6:00-18:00)
 - Night period prices use today's evening (18:00-23:00) and tomorrow's early morning (00:00-05:00)
-

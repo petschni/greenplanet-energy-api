@@ -1,5 +1,7 @@
 """Tests for GreenPlanetEnergyAPI."""
 
+from datetime import date, timedelta
+
 import aiohttp
 import pytest
 from aioresponses import aioresponses
@@ -14,10 +16,16 @@ from greenplanet_energy_api import (
 @pytest.fixture
 def mock_api_response():
     """Mock API response data."""
+    # Use actual current date for testing
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+    today_str = today.strftime("%d.%m.%y")
+    tomorrow_str = tomorrow.strftime("%d.%m.%y")
+
     # Create datum array with proper timestamp format
-    datum_array = [f"04.08.25, {hour:02d}:00 Uhr" for hour in range(24)]
-    # Tomorrow's data: "05.08.25, HH:00 Uhr"
-    datum_array.extend([f"05.08.25, {hour:02d}:00 Uhr" for hour in range(24)])
+    datum_array = [f"{today_str}, {hour:02d}:00 Uhr" for hour in range(24)]
+    # Tomorrow's data
+    datum_array.extend([f"{tomorrow_str}, {hour:02d}:00 Uhr" for hour in range(24)])
 
     # Create wert array (prices as strings with German decimal comma format)
     # Today's prices: 0.20 + (hour * 0.01)
@@ -154,3 +162,99 @@ class TestGreenPlanetEnergyAPI:
             await api.get_electricity_prices()
 
         assert "Session not initialized" in str(exc_info.value)
+
+
+class TestPriceCalculationMethods:
+    """Test price calculation helper methods."""
+
+    @pytest.fixture
+    def sample_price_data(self):
+        """Sample price data for testing."""
+        return {
+            "gpe_price_00": 0.20,
+            "gpe_price_01": 0.19,
+            "gpe_price_02": 0.18,
+            "gpe_price_03": 0.17,
+            "gpe_price_04": 0.16,
+            "gpe_price_05": 0.15,
+            "gpe_price_06": 0.22,  # Day period starts
+            "gpe_price_07": 0.24,
+            "gpe_price_08": 0.26,
+            "gpe_price_09": 0.28,
+            "gpe_price_10": 0.30,
+            "gpe_price_11": 0.32,
+            "gpe_price_12": 0.31,
+            "gpe_price_13": 0.29,
+            "gpe_price_14": 0.27,
+            "gpe_price_15": 0.25,
+            "gpe_price_16": 0.23,
+            "gpe_price_17": 0.21,  # Day period ends
+            "gpe_price_18": 0.19,  # Night period starts
+            "gpe_price_19": 0.17,
+            "gpe_price_20": 0.15,
+            "gpe_price_21": 0.16,
+            "gpe_price_22": 0.18,
+            "gpe_price_23": 0.20,
+            "gpe_price_00_tomorrow": 0.14,
+            "gpe_price_01_tomorrow": 0.13,
+            "gpe_price_02_tomorrow": 0.12,
+            "gpe_price_03_tomorrow": 0.11,
+            "gpe_price_04_tomorrow": 0.10,  # Lowest night price
+            "gpe_price_05_tomorrow": 0.11,
+        }
+
+    async def test_get_highest_price_today(self, sample_price_data):
+        """Test getting highest price for today."""
+        async with GreenPlanetEnergyAPI() as api:
+            highest = api.get_highest_price_today(sample_price_data)
+            assert highest == 0.32  # Hour 11
+
+    async def test_get_lowest_price_day(self, sample_price_data):
+        """Test getting lowest price during day hours (6-18)."""
+        async with GreenPlanetEnergyAPI() as api:
+            lowest = api.get_lowest_price_day(sample_price_data)
+            assert lowest == 0.21  # Hour 17
+
+    async def test_get_lowest_price_night(self, sample_price_data):
+        """Test getting lowest price during night hours (18-6)."""
+        async with GreenPlanetEnergyAPI() as api:
+            lowest = api.get_lowest_price_night(sample_price_data)
+            assert lowest == 0.10  # Hour 4 tomorrow
+
+    async def test_get_current_price(self, sample_price_data):
+        """Test getting current price for specific hour."""
+        async with GreenPlanetEnergyAPI() as api:
+            price_10 = api.get_current_price(sample_price_data, 10)
+            assert price_10 == 0.30
+
+    async def test_get_highest_price_today_with_hour(self, sample_price_data):
+        """Test getting highest price with hour."""
+        async with GreenPlanetEnergyAPI() as api:
+            price, hour = api.get_highest_price_today_with_hour(sample_price_data)
+            assert price == 0.32
+            assert hour == 11
+
+    async def test_get_lowest_price_day_with_hour(self, sample_price_data):
+        """Test getting lowest day price with hour."""
+        async with GreenPlanetEnergyAPI() as api:
+            price, hour = api.get_lowest_price_day_with_hour(sample_price_data)
+            assert price == 0.21
+            assert hour == 17
+
+    async def test_get_lowest_price_night_with_hour(self, sample_price_data):
+        """Test getting lowest night price with hour."""
+        async with GreenPlanetEnergyAPI() as api:
+            price, hour = api.get_lowest_price_night_with_hour(sample_price_data)
+            assert price == 0.10
+            assert hour == 4
+
+    async def test_empty_data(self):
+        """Test methods with empty data."""
+        async with GreenPlanetEnergyAPI() as api:
+            assert api.get_highest_price_today({}) is None
+            assert api.get_lowest_price_day({}) is None
+            assert api.get_lowest_price_night({}) is None
+            assert api.get_current_price({}, 10) is None
+            assert api.get_highest_price_today_with_hour({}) == (None, None)
+            assert api.get_lowest_price_day_with_hour({}) == (None, None)
+            assert api.get_lowest_price_night_with_hour({}) == (None, None)
