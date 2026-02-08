@@ -258,3 +258,51 @@ class TestPriceCalculationMethods:
             assert api.get_highest_price_today_with_hour({}) == (None, None)
             assert api.get_lowest_price_day_with_hour({}) == (None, None)
             assert api.get_lowest_price_night_with_hour({}) == (None, None)
+            assert api.get_cheapest_duration_day({}, 2.5) == (None, None)
+            assert api.get_cheapest_duration_night({}, 2.5) == (None, None)
+
+    async def test_get_cheapest_duration_day(self, sample_price_data):
+        """Test getting cheapest duration during day hours."""
+        async with GreenPlanetEnergyAPI() as api:
+            # Test 2.5 hour window during day (6-18)
+            avg_price, start_hour = api.get_cheapest_duration_day(
+                sample_price_data, 2.5
+            )
+            assert avg_price is not None
+            assert start_hour is not None
+            # Should find a window starting around hour 15-17 (lowest prices in day)
+            assert 15 <= start_hour <= 17
+
+    async def test_get_cheapest_duration_night(self, sample_price_data):
+        """Test getting cheapest duration during night hours."""
+        async with GreenPlanetEnergyAPI() as api:
+            # Test 2.5 hour window during night (18-6)
+            avg_price, start_hour = api.get_cheapest_duration_night(
+                sample_price_data, 2.5
+            )
+            assert avg_price is not None
+            assert start_hour is not None
+            # Should find a window in early morning (hours 2-4 tomorrow have lowest prices)
+            assert start_hour in [2, 3, 4] or start_hour in [20, 21, 22]
+
+    async def test_get_cheapest_duration_day_whole_hours(self, sample_price_data):
+        """Test getting cheapest duration with whole hours."""
+        async with GreenPlanetEnergyAPI() as api:
+            # Test 3 hour window during day
+            avg_price, start_hour = api.get_cheapest_duration_day(
+                sample_price_data, 3.0
+            )
+            assert avg_price is not None
+            assert start_hour is not None
+            # Verify it's actually during day period
+            assert 6 <= start_hour < 18
+
+    async def test_get_cheapest_duration_invalid_duration(self, sample_price_data):
+        """Test with invalid duration values."""
+        async with GreenPlanetEnergyAPI() as api:
+            # Zero duration
+            assert api.get_cheapest_duration_day(sample_price_data, 0) == (None, None)
+            # Negative duration
+            assert api.get_cheapest_duration_day(sample_price_data, -1) == (None, None)
+            # Duration longer than available period
+            assert api.get_cheapest_duration_day(sample_price_data, 20) == (None, None)

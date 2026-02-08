@@ -357,3 +357,124 @@ class GreenPlanetEnergyAPI:
                 return lowest_price, hour
 
         return lowest_price, None
+
+    def get_cheapest_duration_day(
+        self, data: dict[str, float], duration_hours: float
+    ) -> tuple[float | None, int | None]:
+        """Get cheapest consecutive period during day hours (6-18).
+
+        Uses a sliding window to find the consecutive period with the lowest
+        average price during the day (06:00-18:00).
+
+        Args:
+            data: Price data dictionary with hourly prices
+            duration_hours: Duration of the period in hours (e.g., 2.5)
+
+        Returns:
+            Tuple of (average_price, start_hour) or (None, None) if insufficient data
+        """
+        if not data or duration_hours <= 0:
+            return None, None
+
+        # Day period: 6:00 to 18:00 (hours 6-17)
+        day_hours = list(range(6, 18))
+
+        return self._find_cheapest_window(data, day_hours, duration_hours, False)
+
+    def get_cheapest_duration_night(
+        self, data: dict[str, float], duration_hours: float
+    ) -> tuple[float | None, int | None]:
+        """Get cheapest consecutive period during night hours (18-6).
+
+        Uses a sliding window to find the consecutive period with the lowest
+        average price during the night (18:00-06:00), wrapping around midnight.
+
+        Args:
+            data: Price data dictionary with hourly prices
+            duration_hours: Duration of the period in hours (e.g., 2.5)
+
+        Returns:
+            Tuple of (average_price, start_hour) or (None, None) if insufficient data
+        """
+        if not data or duration_hours <= 0:
+            return None, None
+
+        # Night period: 18:00 to 06:00 (hours 18-23 today, 0-5 tomorrow)
+        night_hours = list(range(18, 24)) + list(range(6))
+
+        return self._find_cheapest_window(data, night_hours, duration_hours, True)
+
+    def _find_cheapest_window(
+        self,
+        data: dict[str, float],
+        hours: list[int],
+        duration_hours: float,
+        use_tomorrow: bool,
+    ) -> tuple[float | None, int | None]:
+        """Find the cheapest consecutive window of specified duration.
+
+        Args:
+            data: Price data dictionary with hourly prices
+            hours: List of hours to search within
+            duration_hours: Duration of the window in hours
+            use_tomorrow: Whether to use tomorrow's data for early morning hours
+
+        Returns:
+            Tuple of (average_price, start_hour) or (None, None)
+        """
+        if not hours or duration_hours > len(hours):
+            return None, None
+
+        # Build a list of (hour, price) tuples for available hours
+        hour_prices: list[tuple[int, float]] = []
+        for hour in hours:
+            # For night period, use tomorrow's data for hours 0-5
+            if use_tomorrow and hour < 6:
+                price_key = f"gpe_price_{hour:02d}_tomorrow"
+            else:
+                price_key = f"gpe_price_{hour:02d}"
+
+            if price_key in data and data[price_key] is not None:
+                hour_prices.append((hour, data[price_key]))
+
+        if not hour_prices:
+            return None, None
+
+        # Calculate number of hours in the window (handle fractional hours)
+        # For fractional hours, we need to interpolate
+        window_size = int(duration_hours)
+        has_fraction = duration_hours % 1 != 0
+
+        best_avg_price = float("inf")
+        best_start_hour = None
+
+        # Sliding window approach
+        for i in range(len(hour_prices) - window_size + (0 if has_fraction else 1)):
+            window_sum = 0.0
+            window_hours = 0.0
+
+            # Add full hours
+            for j in range(window_size):
+                if i + j < len(hour_prices):
+                    window_sum += hour_prices[i + j][1]
+                    window_hours += 1.0
+
+            # Add fractional hour if needed
+            if has_fraction and i + window_size < len(hour_prices):
+                fraction = duration_hours % 1
+                window_sum += hour_prices[i + window_size][1] * fraction
+                window_hours += fraction
+
+            # Only consider windows with the correct duration
+            if (
+                window_hours >= duration_hours - 0.01
+            ):  # Allow small floating point errors
+                avg_price = window_sum / duration_hours
+                if avg_price < best_avg_price:
+                    best_avg_price = avg_price
+                    best_start_hour = hour_prices[i][0]
+
+        if best_start_hour is None:
+            return None, None
+
+        return best_avg_price, best_start_hour
