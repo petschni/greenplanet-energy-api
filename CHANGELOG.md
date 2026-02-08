@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-02-08
+
+### Added
+- New `get_cheapest_duration_day()` method to find the cheapest consecutive period during day hours (6:00-18:00)
+- New `get_cheapest_duration_night()` method to find the cheapest consecutive period during night hours (18:00-06:00)
+- Support for fractional hour durations (e.g., 2.5 hours) in duration-based price calculations
+- Sliding window algorithm for optimized consecutive period price calculations
+- Comprehensive test coverage for duration-based price queries
+
+### Changed
+- Enhanced API with more flexible time-window based price queries
+- Improved handling of overnight periods that wrap around midnight
+
+## [0.1.4] - 2025-08-04
+
+### Added
+- Pre-commit hooks for code quality
+- Comprehensive test suite improvements
+
+## [0.1.3] - 2025-08-04
+
+### Changed
+- Moved calculation logic to API package
+
 ## [0.1.2] - 2025-08-04
 
 ### Fixed
