@@ -358,6 +358,29 @@ class GreenPlanetEnergyAPI:
 
         return lowest_price, None
 
+    def get_cheapest_duration(
+        self, data: dict[str, float], duration_hours: float
+    ) -> tuple[float | None, int | None]:
+        """Get cheapest consecutive period during the full day (0-24).
+
+        Uses a sliding window to find the consecutive period with the lowest
+        average price during the entire day (00:00-24:00).
+
+        Args:
+            data: Price data dictionary with hourly prices
+            duration_hours: Duration of the period in hours (e.g., 2.5)
+
+        Returns:
+            Tuple of (average_price, start_hour) or (None, None) if insufficient data
+        """
+        if not data or duration_hours <= 0:
+            return None, None
+
+        # Full day period: 0:00 to 24:00 (hours 0-23)
+        full_day_hours = list(range(24))
+
+        return self._find_cheapest_window(data, full_day_hours, duration_hours, False)
+
     def get_cheapest_duration_day(
         self, data: dict[str, float], duration_hours: float
     ) -> tuple[float | None, int | None]:

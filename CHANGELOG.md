@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-02-20
+
+### Added
+- New `get_cheapest_duration()` method to find the cheapest consecutive period during the full day (00:00-24:00)
+- Complete coverage for all time ranges: full day, day (06:00-18:00), and night (18:00-06:00)
+
 ## [0.1.5] - 2026-02-08
 
 ### Added
