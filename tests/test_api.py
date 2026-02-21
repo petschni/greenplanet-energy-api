@@ -357,9 +357,9 @@ class TestPriceCalculationMethods:
             )
             assert avg_price is not None
             assert start_hour is not None
-            assert start_hour > 20 or start_hour < 6, (
-                "Should not return hours 18-20 (past)"
-            )
+            assert (
+                start_hour > 20 or start_hour < 6
+            ), "Should not return hours 18-20 (past)"
 
             # Test night search when in night period early morning (e.g., at 02:00)
             # Should filter out hours 18-23 (yesterday) and 0-2 (today)
@@ -535,9 +535,9 @@ class TestPriceCalculationMethods:
             )
             assert avg_price is not None
             assert start_hour is not None
-            assert 6 <= start_hour < 18, (
-                f"Should use tomorrow's day hours, got {start_hour}"
-            )
+            assert (
+                6 <= start_hour < 18
+            ), f"Should use tomorrow's day hours, got {start_hour}"
 
             # Test with incomplete tomorrow data (only hours 0-10)
             incomplete_data = {
