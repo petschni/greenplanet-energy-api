@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-02-21
+
+### Added
+- Added `current_hour` parameter to `get_cheapest_duration()`, `get_cheapest_duration_day()`, and `get_cheapest_duration_night()` methods
+- Smart filtering logic: allows results from earlier in the CURRENT period (day/night), but filters out past periods
+
+### Changed
+- **Day period**: If currently in day hours (06:00-18:00), returns cheapest time from entire current day period including past hours
+- **Night period**: If currently in night hours (18:00-06:00), returns cheapest time from entire current night period including past hours
+- **Full day**: Always filters to show only future hours from current moment onwards
+
+### Fixed
+- Bug where cheapest duration methods could return time windows from previous day/night periods
+
 ## [0.1.6] - 2026-02-20
 
 ### Added

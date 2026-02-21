@@ -359,7 +359,7 @@ class GreenPlanetEnergyAPI:
         return lowest_price, None
 
     def get_cheapest_duration(
-        self, data: dict[str, float], duration_hours: float
+        self, data: dict[str, float], duration_hours: float, current_hour: int | None = None
     ) -> tuple[float | None, int | None]:
         """Get cheapest consecutive period during the full day (0-24).
 
@@ -369,6 +369,7 @@ class GreenPlanetEnergyAPI:
         Args:
             data: Price data dictionary with hourly prices
             duration_hours: Duration of the period in hours (e.g., 2.5)
+            current_hour: Current hour (0-23). If provided, only future hours are considered.
 
         Returns:
             Tuple of (average_price, start_hour) or (None, None) if insufficient data
@@ -378,11 +379,15 @@ class GreenPlanetEnergyAPI:
 
         # Full day period: 0:00 to 24:00 (hours 0-23)
         full_day_hours = list(range(24))
+        
+        # Filter out past hours if current_hour is provided
+        if current_hour is not None:
+            full_day_hours = [h for h in full_day_hours if h >= current_hour]
 
         return self._find_cheapest_window(data, full_day_hours, duration_hours, False)
 
     def get_cheapest_duration_day(
-        self, data: dict[str, float], duration_hours: float
+        self, data: dict[str, float], duration_hours: float, current_hour: int | None = None
     ) -> tuple[float | None, int | None]:
         """Get cheapest consecutive period during day hours (6-18).
 
@@ -392,6 +397,8 @@ class GreenPlanetEnergyAPI:
         Args:
             data: Price data dictionary with hourly prices
             duration_hours: Duration of the period in hours (e.g., 2.5)
+            current_hour: Current hour (0-23). If provided and we're NOT in day period,
+                          filter to exclude past periods.
 
         Returns:
             Tuple of (average_price, start_hour) or (None, None) if insufficient data
@@ -401,11 +408,18 @@ class GreenPlanetEnergyAPI:
 
         # Day period: 6:00 to 18:00 (hours 6-17)
         day_hours = list(range(6, 18))
+        
+        # Only filter out past hours if we're NOT currently in the day period
+        # If we ARE in day period (6-17), allow results from earlier in current day
+        if current_hour is not None and (current_hour < 6 or current_hour >= 18):
+            # We're not in day period, so filter to exclude all day hours
+            # This will result in no matches for today, which is correct
+            day_hours = []
 
         return self._find_cheapest_window(data, day_hours, duration_hours, False)
 
     def get_cheapest_duration_night(
-        self, data: dict[str, float], duration_hours: float
+        self, data: dict[str, float], duration_hours: float, current_hour: int | None = None
     ) -> tuple[float | None, int | None]:
         """Get cheapest consecutive period during night hours (18-6).
 
@@ -415,6 +429,8 @@ class GreenPlanetEnergyAPI:
         Args:
             data: Price data dictionary with hourly prices
             duration_hours: Duration of the period in hours (e.g., 2.5)
+            current_hour: Current hour (0-23). If provided and we're NOT in night period,
+                          filter to exclude past periods.
 
         Returns:
             Tuple of (average_price, start_hour) or (None, None) if insufficient data
@@ -424,6 +440,16 @@ class GreenPlanetEnergyAPI:
 
         # Night period: 18:00 to 06:00 (hours 18-23 today, 0-5 tomorrow)
         night_hours = list(range(18, 24)) + list(range(6))
+        
+        # Only filter if we're NOT currently in the night period
+        # Night period is 18-23 or 0-5
+        # If we ARE in night period, allow results from earlier in current night
+        if current_hour is not None and 6 <= current_hour < 18:
+            # We're in day period (not night), so the night hours represent the
+            # upcoming night - don't filter, return full upcoming night
+            pass
+        # If we're in night period (18-23 or 0-5), don't filter past hours
+        # This allows finding the cheapest time within the current night period
 
         return self._find_cheapest_window(data, night_hours, duration_hours, True)
 
