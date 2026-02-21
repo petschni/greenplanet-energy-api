@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "greenplanet-energy-api"
-version = "0.1.7"
+version = "0.1.8"
 description = "Python API client for Green Planet Energy electricity pricing data"
 readme = "README.md"
 license = {text = "MIT"}

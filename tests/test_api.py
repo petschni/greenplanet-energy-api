@@ -195,12 +195,31 @@ class TestPriceCalculationMethods:
             "gpe_price_21": 0.16,
             "gpe_price_22": 0.18,
             "gpe_price_23": 0.20,
+            # Tomorrow's prices (full 24 hours)
             "gpe_price_00_tomorrow": 0.14,
             "gpe_price_01_tomorrow": 0.13,
             "gpe_price_02_tomorrow": 0.12,
             "gpe_price_03_tomorrow": 0.11,
             "gpe_price_04_tomorrow": 0.10,  # Lowest night price
             "gpe_price_05_tomorrow": 0.11,
+            "gpe_price_06_tomorrow": 0.19,  # Day period tomorrow
+            "gpe_price_07_tomorrow": 0.21,
+            "gpe_price_08_tomorrow": 0.23,
+            "gpe_price_09_tomorrow": 0.25,
+            "gpe_price_10_tomorrow": 0.27,
+            "gpe_price_11_tomorrow": 0.29,
+            "gpe_price_12_tomorrow": 0.28,
+            "gpe_price_13_tomorrow": 0.26,
+            "gpe_price_14_tomorrow": 0.24,
+            "gpe_price_15_tomorrow": 0.22,
+            "gpe_price_16_tomorrow": 0.20,
+            "gpe_price_17_tomorrow": 0.18,
+            "gpe_price_18_tomorrow": 0.16,
+            "gpe_price_19_tomorrow": 0.15,
+            "gpe_price_20_tomorrow": 0.14,
+            "gpe_price_21_tomorrow": 0.15,
+            "gpe_price_22_tomorrow": 0.17,
+            "gpe_price_23_tomorrow": 0.19,
         }
 
     async def test_get_highest_price_today(self, sample_price_data):
@@ -306,3 +325,225 @@ class TestPriceCalculationMethods:
             assert api.get_cheapest_duration_day(sample_price_data, -1) == (None, None)
             # Duration longer than available period
             assert api.get_cheapest_duration_day(sample_price_data, 20) == (None, None)
+
+    async def test_get_cheapest_duration_with_current_hour_filtering(
+        self, sample_price_data
+    ):
+        """Test cheapest duration methods with current_hour filtering."""
+        async with GreenPlanetEnergyAPI() as api:
+            # Test day search when in day period (e.g., at 10:00)
+            # Should filter out hours before 10:00
+            avg_price, start_hour = api.get_cheapest_duration_day(
+                sample_price_data, 3.0, current_hour=10
+            )
+            assert avg_price is not None
+            assert start_hour is not None
+            assert start_hour >= 10, "Should not return past hours from current day"
+            assert start_hour < 18, "Should be within day period"
+
+            # Test day search when outside day period (e.g., at 20:00)
+            # Should use tomorrow's data
+            avg_price, start_hour = api.get_cheapest_duration_day(
+                sample_price_data, 3.0, current_hour=20
+            )
+            assert avg_price is not None
+            assert start_hour is not None
+            assert 6 <= start_hour < 18, "Should return tomorrow's day hours"
+
+            # Test night search when in night period evening (e.g., at 20:00)
+            # Should filter out hours 18-20
+            avg_price, start_hour = api.get_cheapest_duration_night(
+                sample_price_data, 3.0, current_hour=20
+            )
+            assert avg_price is not None
+            assert start_hour is not None
+            assert start_hour > 20 or start_hour < 6, (
+                "Should not return hours 18-20 (past)"
+            )
+
+            # Test night search when in night period early morning (e.g., at 02:00)
+            # Should filter out hours 18-23 (yesterday) and 0-2 (today)
+            avg_price, start_hour = api.get_cheapest_duration_night(
+                sample_price_data, 3.0, current_hour=2
+            )
+            assert avg_price is not None
+            assert start_hour is not None
+            assert start_hour > 2 or start_hour >= 18, "Should filter past hours 0-2"
+
+            # Test night search when in day period (e.g., at 14:00)
+            # Should return full upcoming night (no filtering)
+            avg_price, start_hour = api.get_cheapest_duration_night(
+                sample_price_data, 3.0, current_hour=14
+            )
+            assert avg_price is not None
+            assert start_hour is not None
+            # Should find cheapest in upcoming night (hours 18-23 or 0-5 tomorrow)
+
+            # Test full day search with current_hour (e.g., at 14:00)
+            # Should filter out hours 0-13
+            avg_price, start_hour = api.get_cheapest_duration(
+                sample_price_data, 3.0, current_hour=14
+            )
+            assert avg_price is not None
+            assert start_hour is not None
+            assert start_hour >= 14, "Should not return past hours"
+
+    async def test_get_cheapest_duration_no_valid_windows(self):
+        """Test when no valid windows exist due to filtering."""
+        # Create data with only early hours
+        test_data = {
+            "gpe_price_00": 0.20,
+            "gpe_price_01": 0.21,
+            "gpe_price_02": 0.22,
+            "gpe_price_03": 0.23,
+        }
+
+        async with GreenPlanetEnergyAPI() as api:
+            # Try to get 3-hour window when at hour 23 (no future hours available)
+            avg_price, start_hour = api.get_cheapest_duration(
+                test_data, 3.0, current_hour=23
+            )
+            # Should return None because not enough future hours
+            assert avg_price is None
+            assert start_hour is None
+
+    async def test_get_cheapest_duration_edge_cases(self, sample_price_data):
+        """Test edge cases for current_hour filtering."""
+        async with GreenPlanetEnergyAPI() as api:
+            # Test at start of day period (6:00)
+            avg_price, start_hour = api.get_cheapest_duration_day(
+                sample_price_data, 2.0, current_hour=6
+            )
+            assert avg_price is not None
+            assert start_hour >= 6
+
+            # Test at end of day period (17:00)
+            avg_price, start_hour = api.get_cheapest_duration_day(
+                sample_price_data, 1.0, current_hour=17
+            )
+            assert avg_price is not None
+            assert start_hour == 17  # Only hour 17 available for 1-hour duration
+
+            # Test at start of night period (18:00)
+            avg_price, start_hour = api.get_cheapest_duration_night(
+                sample_price_data, 2.0, current_hour=18
+            )
+            assert avg_price is not None
+            assert start_hour > 18 or start_hour < 6
+
+            # Test at midnight (0:00) in night period
+            avg_price, start_hour = api.get_cheapest_duration_night(
+                sample_price_data, 2.0, current_hour=0
+            )
+            assert avg_price is not None
+            assert start_hour > 0 or start_hour >= 18
+
+    async def test_get_cheapest_duration_fractional_hours_with_filtering(
+        self, sample_price_data
+    ):
+        """Test fractional duration with current_hour filtering."""
+        async with GreenPlanetEnergyAPI() as api:
+            # Test 2.5 hour window at hour 15 during day
+            avg_price, start_hour = api.get_cheapest_duration_day(
+                sample_price_data, 2.5, current_hour=15
+            )
+            assert avg_price is not None
+            assert start_hour is not None
+            assert start_hour >= 15, "Should respect current_hour filter"
+            assert start_hour < 18, "Should be in day period"
+
+            # Test 3.7 hour window at hour 19 during night
+            avg_price, start_hour = api.get_cheapest_duration_night(
+                sample_price_data, 3.7, current_hour=19
+            )
+            assert avg_price is not None
+            assert start_hour is not None
+            assert start_hour > 19 or start_hour < 6, "Should filter past hour 19"
+
+    async def test_with_real_api_data_pattern(self):
+        """Test with real API data pattern showing incomplete tomorrow data."""
+        # Simulate processed data from real API response
+        # where tomorrow (22.02.26) has complete 24h data
+        real_data = {
+            # Today (21.02.26) - last value from each hour's 15-min intervals
+            "gpe_price_00": 0.2516,
+            "gpe_price_01": 0.2327,
+            "gpe_price_02": 0.2373,
+            "gpe_price_03": 0.2562,
+            "gpe_price_04": 0.2435,
+            "gpe_price_05": 0.2473,
+            "gpe_price_06": 0.2418,
+            "gpe_price_07": 0.2516,
+            "gpe_price_08": 0.2579,
+            "gpe_price_09": 0.2434,
+            "gpe_price_10": 0.2651,
+            "gpe_price_11": 0.2636,
+            "gpe_price_12": 0.2549,
+            "gpe_price_13": 0.2713,
+            "gpe_price_14": 0.2484,
+            "gpe_price_15": 0.2492,
+            "gpe_price_16": 0.2825,
+            "gpe_price_17": 0.3024,
+            "gpe_price_18": 0.3036,
+            "gpe_price_19": 0.3248,
+            "gpe_price_20": 0.3126,
+            "gpe_price_21": 0.3004,  # Current time around here
+            "gpe_price_22": 0.2906,
+            "gpe_price_23": 0.3001,
+            # Tomorrow (22.02.26) - complete 24h
+            "gpe_price_00_tomorrow": 0.2539,
+            "gpe_price_01_tomorrow": 0.2522,
+            "gpe_price_02_tomorrow": 0.2496,
+            "gpe_price_03_tomorrow": 0.2443,
+            "gpe_price_04_tomorrow": 0.2476,
+            "gpe_price_05_tomorrow": 0.2486,
+            "gpe_price_06_tomorrow": 0.2616,
+            "gpe_price_07_tomorrow": 0.2768,
+            "gpe_price_08_tomorrow": 0.2881,
+            "gpe_price_09_tomorrow": 0.3040,
+            "gpe_price_10_tomorrow": 0.2954,
+            "gpe_price_11_tomorrow": 0.2927,
+            "gpe_price_12_tomorrow": 0.2751,
+            "gpe_price_13_tomorrow": 0.2799,
+            "gpe_price_14_tomorrow": 0.2645,
+            "gpe_price_15_tomorrow": 0.2825,
+            "gpe_price_16_tomorrow": 0.2668,
+            "gpe_price_17_tomorrow": 0.2348,
+        }
+
+        async with GreenPlanetEnergyAPI() as api:
+            # Test night search at 21:00 (should filter out 18-21, use 22-23 and tomorrow 0-5)
+            avg_price, start_hour = api.get_cheapest_duration_night(
+                real_data, 3.0, current_hour=21
+            )
+            assert avg_price is not None
+            assert start_hour is not None
+            # Should find cheapest in hours 22-23 or 0-5 tomorrow
+            assert start_hour in [22, 23, 0, 1, 2, 3, 4], (
+                f"Expected night hours after 21:00, got {start_hour}"
+            )
+
+            # Test day search at 21:00 (outside day period, should use tomorrow's day hours)
+            avg_price, start_hour = api.get_cheapest_duration_day(
+                real_data, 3.0, current_hour=21
+            )
+            assert avg_price is not None
+            assert start_hour is not None
+            assert 6 <= start_hour < 18, (
+                f"Should use tomorrow's day hours, got {start_hour}"
+            )
+
+            # Test with incomplete tomorrow data (only hours 0-10)
+            incomplete_data = {
+                k: v
+                for k, v in real_data.items()
+                if not (k.endswith("_tomorrow") and int(k.split("_")[2]) > 10)
+            }
+
+            # Day search should still work with partial tomorrow data
+            avg_price, start_hour = api.get_cheapest_duration_day(
+                incomplete_data, 3.0, current_hour=21
+            )
+            assert avg_price is not None
+            assert start_hour is not None
+            assert 6 <= start_hour <= 10, "Should work with available tomorrow hours"

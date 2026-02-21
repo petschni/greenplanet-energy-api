@@ -415,14 +415,16 @@ class GreenPlanetEnergyAPI:
         # Day period: 6:00 to 18:00 (hours 6-17)
         day_hours = list(range(6, 18))
 
-        # Only filter out past hours if we're NOT currently in the day period
-        # If we ARE in day period (6-17), allow results from earlier in current day
+        # Determine whether to use tomorrow's data
+        use_tomorrow = False
         if current_hour is not None and (current_hour < 6 or current_hour >= 18):
-            # We're not in day period, so filter to exclude all day hours
-            # This will result in no matches for today, which is correct
-            day_hours = []
+            # We're not in day period, so use tomorrow's day hours
+            use_tomorrow = True
+        elif current_hour is not None:
+            # We ARE in day period - filter out past hours from today
+            day_hours = [h for h in day_hours if h >= current_hour]
 
-        return self._find_cheapest_window(data, day_hours, duration_hours, False)
+        return self._find_cheapest_window(data, day_hours, duration_hours, use_tomorrow)
 
     def get_cheapest_duration_night(
         self,
@@ -450,15 +452,23 @@ class GreenPlanetEnergyAPI:
         # Night period: 18:00 to 06:00 (hours 18-23 today, 0-5 tomorrow)
         night_hours = list(range(18, 24)) + list(range(6))
 
-        # Only filter if we're NOT currently in the night period
-        # Night period is 18-23 or 0-5
-        # If we ARE in night period, allow results from earlier in current night
-        if current_hour is not None and 6 <= current_hour < 18:
-            # We're in day period (not night), so the night hours represent the
-            # upcoming night - don't filter, return full upcoming night
-            pass
-        # If we're in night period (18-23 or 0-5), don't filter past hours
-        # This allows finding the cheapest time within the current night period
+        # Filter based on current hour
+        if current_hour is not None:
+            if 6 <= current_hour < 18:
+                # We're in day period - the night hours represent the upcoming night
+                # Don't filter, return full upcoming night
+                pass
+            else:
+                # We're in night period (18-23 or 0-5) - filter out past hours
+                # from the current night to avoid returning past times
+                if current_hour >= 18:
+                    # Evening: filter out hours from 18 to current_hour
+                    night_hours = [h for h in night_hours if h > current_hour or h < 6]
+                else:
+                    # Early morning (0-5): filter out hours from 0 to current_hour
+                    night_hours = [
+                        h for h in night_hours if h >= 18 or h > current_hour
+                    ]
 
         return self._find_cheapest_window(data, night_hours, duration_hours, True)
 
@@ -475,7 +485,10 @@ class GreenPlanetEnergyAPI:
             data: Price data dictionary with hourly prices
             hours: List of hours to search within
             duration_hours: Duration of the window in hours
-            use_tomorrow: Whether to use tomorrow's data for early morning hours
+            use_tomorrow: Whether to use tomorrow's data. When True:
+                         - Hours 0-5: Use tomorrow (night after midnight)
+                         - Hours 6-17: Use tomorrow (next day period)
+                         - Hours 18-23: Use today (night before midnight)
 
         Returns:
             Tuple of (average_price, start_hour) or (None, None)
@@ -486,9 +499,18 @@ class GreenPlanetEnergyAPI:
         # Build a list of (hour, price) tuples for available hours
         hour_prices: list[tuple[int, float]] = []
         for hour in hours:
-            # For night period, use tomorrow's data for hours 0-5
-            if use_tomorrow and hour < 6:
-                price_key = f"gpe_price_{hour:02d}_tomorrow"
+            # For night period: use tomorrow's data only for hours 0-5 (after midnight)
+            # For day period outside current day: use tomorrow's data for all hours
+            if use_tomorrow:
+                if hour < 6:
+                    # Always use tomorrow for early morning hours (0-5)
+                    price_key = f"gpe_price_{hour:02d}_tomorrow"
+                elif hour >= 18:
+                    # Evening hours (18-23) use today when in night search
+                    price_key = f"gpe_price_{hour:02d}"
+                else:
+                    # Day hours (6-17) use tomorrow when searching outside day period
+                    price_key = f"gpe_price_{hour:02d}_tomorrow"
             else:
                 price_key = f"gpe_price_{hour:02d}"
 
