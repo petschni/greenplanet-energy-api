@@ -519,9 +519,15 @@ class TestPriceCalculationMethods:
             assert avg_price is not None
             assert start_hour is not None
             # Should find cheapest in hours 22-23 or 0-5 tomorrow
-            assert start_hour in [22, 23, 0, 1, 2, 3, 4], (
-                f"Expected night hours after 21:00, got {start_hour}"
-            )
+            assert start_hour in [
+                22,
+                23,
+                0,
+                1,
+                2,
+                3,
+                4,
+            ], f"Expected night hours after 21:00, got {start_hour}"
 
             # Test day search at 21:00 (outside day period, should use tomorrow's day hours)
             avg_price, start_hour = api.get_cheapest_duration_day(
