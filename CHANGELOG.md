@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-03-20
+
+### Changed
+- `_process_response` now parses timestamps at 15-minute resolution (e.g.
+  `"09:15 Uhr"`) and stores each slot under a `gpe_price_HH_MM[_tomorrow]` key
+  (e.g. `gpe_price_09_15`). 15-minute granularity is provided by the API as
+  required by law.
+- For backward compatibility, the `gpe_price_HH[_tomorrow]` hourly key is still
+  written, but only for the `:00` slot of each hour so its value is
+  deterministic.
+
 ## [0.1.7] - 2026-02-21
 
 ### Added

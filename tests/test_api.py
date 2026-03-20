@@ -15,24 +15,42 @@ from greenplanet_energy_api import (
 
 @pytest.fixture
 def mock_api_response():
-    """Mock API response data."""
+    """Mock API response data with 15-minute resolution."""
     # Use actual current date for testing
     today = date.today()
     tomorrow = today + timedelta(days=1)
     today_str = today.strftime("%d.%m.%y")
     tomorrow_str = tomorrow.strftime("%d.%m.%y")
 
-    # Create datum array with proper timestamp format
-    datum_array = [f"{today_str}, {hour:02d}:00 Uhr" for hour in range(24)]
-    # Tomorrow's data
-    datum_array.extend([f"{tomorrow_str}, {hour:02d}:00 Uhr" for hour in range(24)])
+    # Create datum array with proper 15-minute resolution timestamps
+    datum_array = [
+        f"{today_str}, {hour:02d}:{minute:02d} Uhr"
+        for hour in range(24)
+        for minute in (0, 15, 30, 45)
+    ]
+    datum_array.extend(
+        [
+            f"{tomorrow_str}, {hour:02d}:{minute:02d} Uhr"
+            for hour in range(24)
+            for minute in (0, 15, 30, 45)
+        ]
+    )
 
-    # Create wert array (prices as strings with German decimal comma format)
-    # Today's prices: 0.20 + (hour * 0.01)
-    wert_array = [f"{0.20 + (hour * 0.01):.2f}".replace(".", ",") for hour in range(24)]
-    # Tomorrow's prices: 0.25 + (hour * 0.01) (slightly different for testing)
+    # Create wert array (prices as strings with German decimal comma format).
+    # Use a formula that distinguishes each 15-min slot:
+    #   today:    0.20 + hour * 0.01 + minute * 0.0001
+    #   tomorrow: 0.25 + hour * 0.01 + minute * 0.0001
+    wert_array = [
+        f"{0.20 + hour * 0.01 + minute * 0.0001:.4f}".replace(".", ",")
+        for hour in range(24)
+        for minute in (0, 15, 30, 45)
+    ]
     wert_array.extend(
-        [f"{0.25 + (hour * 0.01):.2f}".replace(".", ",") for hour in range(24)]
+        [
+            f"{0.25 + hour * 0.01 + minute * 0.0001:.4f}".replace(".", ",")
+            for hour in range(24)
+            for minute in (0, 15, 30, 45)
+        ]
     )
 
     return {
@@ -76,22 +94,42 @@ class TestGreenPlanetEnergyAPI:
             async with GreenPlanetEnergyAPI() as api:
                 prices = await api.get_electricity_prices()
 
-            # Should have 48 total prices (24 today + 24 tomorrow)
-            assert len(prices) == 48
+        # 24 hours × 4 quarters = 96 quarter-hour keys per day
+        # + 24 backward-compat hourly keys per day (only for :00 slots)
+        # × 2 days (today + tomorrow) = (96 + 24) × 2 = 240
+        assert len(prices) == 240
 
-            # Check today's prices
-            for hour in range(24):
-                key = f"gpe_price_{hour:02d}"
-                assert key in prices
-                expected_price = round(0.20 + (hour * 0.01), 2)
-                assert abs(prices[key] - expected_price) < 0.001
+        # Check today's quarter-hour keys
+        for hour in range(24):
+            for minute in (0, 15, 30, 45):
+                key = f"gpe_price_{hour:02d}_{minute:02d}"
+                assert key in prices, f"Missing key: {key}"
+                expected = round(0.20 + hour * 0.01 + minute * 0.0001, 4)
+                assert abs(prices[key] - expected) < 0.00011, (
+                    f"{key}: expected {expected}, got {prices[key]}"
+                )
 
-            # Check tomorrow's prices
-            for hour in range(24):
-                key = f"gpe_price_{hour:02d}_tomorrow"
-                assert key in prices
-                expected_price = round(0.25 + (hour * 0.01), 2)
-                assert abs(prices[key] - expected_price) < 0.001
+        # Check backward-compat hourly keys (only :00 slot)
+        for hour in range(24):
+            key = f"gpe_price_{hour:02d}"
+            assert key in prices, f"Missing hourly key: {key}"
+            expected = round(0.20 + hour * 0.01, 4)  # :00 slot
+            assert abs(prices[key] - expected) < 0.00011
+
+        # Check tomorrow's quarter-hour keys
+        for hour in range(24):
+            for minute in (0, 15, 30, 45):
+                key = f"gpe_price_{hour:02d}_{minute:02d}_tomorrow"
+                assert key in prices, f"Missing key: {key}"
+                expected = round(0.25 + hour * 0.01 + minute * 0.0001, 4)
+                assert abs(prices[key] - expected) < 0.00011
+
+        # Check backward-compat tomorrow hourly keys (only :00 slot)
+        for hour in range(24):
+            key = f"gpe_price_{hour:02d}_tomorrow"
+            assert key in prices, f"Missing hourly key: {key}"
+            expected = round(0.25 + hour * 0.01, 4)
+            assert abs(prices[key] - expected) < 0.00011
 
     async def test_get_electricity_prices_api_error(self, mock_api_error_response):
         """Test API error handling."""

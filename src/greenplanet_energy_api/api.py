@@ -116,7 +116,13 @@ class GreenPlanetEnergyAPI:
             ) from err
 
     def _process_response(self, response_data: dict[str, Any]) -> dict[str, float]:
-        """Process the API response and extract hourly prices.
+        """Process the API response and extract 15-minute resolution prices.
+
+        The API returns data at 15-minute intervals as required by law.  Each
+        slot is stored under a key of the form ``gpe_price_HH_MM[_tomorrow]``
+        (e.g. ``gpe_price_09_15``).  For backward compatibility the ``gpe_price_HH``
+        hourly key is also written, but only for the :00 slot of each hour so
+        that its value is deterministic regardless of API ordering.
 
         Args:
             response_data: Raw API response data
@@ -153,16 +159,17 @@ class GreenPlanetEnergyAPI:
         # Process all data points from the API response
         for i, timestamp_str in enumerate(datum_array):
             try:
-                # Parse timestamp string like "04.08.25, 09:00 Uhr"
+                # Parse timestamp string like "04.08.25, 09:15 Uhr"
                 if " Uhr" not in timestamp_str:
                     continue
 
-                # Extract hour part (e.g., "09:00" from "04.08.25, 09:00 Uhr")
+                # Extract time part (e.g., "09:15" from "04.08.25, 09:15 Uhr")
                 time_part = timestamp_str.split(", ")[1].replace(" Uhr", "")
-                hour_str = time_part.split(":")[0]
+                hour_str, minute_str = time_part.split(":")
                 hour = int(hour_str)
+                minute = int(minute_str)
 
-                # Extract date part (e.g., "04.08.25" from "04.08.25, 09:00 Uhr")
+                # Extract date part (e.g., "04.08.25" from "04.08.25, 09:15 Uhr")
                 date_part = timestamp_str.split(", ")[0]
 
                 # Get today and tomorrow dates in the same format
@@ -173,11 +180,9 @@ class GreenPlanetEnergyAPI:
 
                 # Determine if this is today's or tomorrow's data
                 if date_part == today_str:
-                    # Today's price
-                    hour_key = f"gpe_price_{hour:02d}"
+                    suffix = ""
                 elif date_part == tomorrow_str:
-                    # Tomorrow's price
-                    hour_key = f"gpe_price_{hour:02d}_tomorrow"
+                    suffix = "_tomorrow"
                 else:
                     # Unknown date, skip
                     continue
@@ -185,7 +190,18 @@ class GreenPlanetEnergyAPI:
                 # Convert price string to float (handle German decimal comma)
                 price_str = wert_array[i]
                 price_value = float(price_str.replace(",", "."))
-                processed_data[hour_key] = price_value
+
+                # Store 15-minute resolution key (e.g. gpe_price_09_15)
+                quarter_key = f"gpe_price_{hour:02d}_{minute:02d}{suffix}"
+                processed_data[quarter_key] = price_value
+
+                # Also store/update hourly key for backward compatibility with
+                # existing sensors and cheapest-window logic.  Use the :00 slot
+                # as the representative value for each hour so the hourly value
+                # is deterministic regardless of API ordering.
+                if minute == 0:
+                    hour_key = f"gpe_price_{hour:02d}{suffix}"
+                    processed_data[hour_key] = price_value
 
             except (ValueError, IndexError) as err:
                 _LOGGER.debug("Error parsing price data at index %s: %s", i, err)
