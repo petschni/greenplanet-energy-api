@@ -105,9 +105,9 @@ class TestGreenPlanetEnergyAPI:
                 key = f"gpe_price_{hour:02d}_{minute:02d}"
                 assert key in prices, f"Missing key: {key}"
                 expected = round(0.20 + hour * 0.01 + minute * 0.0001, 4)
-                assert abs(prices[key] - expected) < 0.00011, (
-                    f"{key}: expected {expected}, got {prices[key]}"
-                )
+                assert (
+                    abs(prices[key] - expected) < 0.00011
+                ), f"{key}: expected {expected}, got {prices[key]}"
 
         # Check backward-compat hourly keys (only :00 slot)
         for hour in range(24):
