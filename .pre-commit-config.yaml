@@ -1,16 +1,5 @@
 # Pre-commit hooks for greenplanet-energy-api
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.13.3
-    hooks:
-      - id: ruff
-        args: [--fix]
-
-  - repo: https://github.com/psf/black
-    rev: 24.10.0
-    hooks:
-      - id: black
-
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -20,12 +9,31 @@ repos:
       - id: check-added-large-files
       - id: check-merge-conflict
 
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.10
+    hooks:
+      - id: ruff
+        args: [--fix]
+
   - repo: local
     hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        pass_filenames: false
+        always_run: true
+        args: [src/]
+
       - id: pytest
         name: pytest
         entry: pytest
         language: system
         pass_filenames: false
         always_run: true
-        args: [tests/, -v, --cov=greenplanet_energy_api, --cov-report=term-missing]
+        args: [tests/, --no-cov]

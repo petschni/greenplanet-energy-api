@@ -213,6 +213,10 @@ class GreenPlanetEnergyAPI:
     def get_highest_price_today(self, data: dict[str, float]) -> float | None:
         """Get the highest price for today.
 
+        Only hourly keys (``gpe_price_HH``) are considered so that the result
+        is consistent with :meth:`get_highest_price_today_with_hour`, which
+        also searches only hourly keys.
+
         Args:
             data: Price data dictionary with hourly prices
 
@@ -223,20 +227,26 @@ class GreenPlanetEnergyAPI:
             return None
 
         today_prices = [
-            price
-            for key, price in data.items()
-            if key.startswith("gpe_price_")
-            and not key.endswith("_tomorrow")
-            and price is not None
+            data[f"gpe_price_{hour:02d}"]
+            for hour in range(24)
+            if f"gpe_price_{hour:02d}" in data
         ]
 
         return max(today_prices) if today_prices else None
 
-    def get_lowest_price_day(self, data: dict[str, float]) -> float | None:
-        """Get the lowest price during day hours (6-18) for today.
+    def get_lowest_price_day(
+        self, data: dict[str, float], current_hour: int | None = None
+    ) -> float | None:
+        """Get the lowest price during day hours (6-18) for today or tomorrow.
+
+        When ``current_hour`` is 18 or later the day period (06:00-18:00) has
+        already passed for today.  In that case tomorrow's prices are used so
+        that stale past-day information is not returned.
 
         Args:
             data: Price data dictionary with hourly prices
+            current_hour: Current hour (0-23). When >= 18 the method
+                automatically switches to tomorrow's data.
 
         Returns:
             Lowest day price or None if no data available
@@ -244,9 +254,13 @@ class GreenPlanetEnergyAPI:
         if not data:
             return None
 
+        # After 18:00 the day period is over; use tomorrow's data.
+        use_tomorrow = current_hour is not None and current_hour >= 18
+        suffix = "_tomorrow" if use_tomorrow else ""
+
         prices = []
         for hour in range(6, 18):  # Day period: 6:00 to 18:00
-            price_key = f"gpe_price_{hour:02d}"
+            price_key = f"gpe_price_{hour:02d}{suffix}"
             if price_key in data:
                 price = data[price_key]
                 if price is not None:
@@ -324,22 +338,29 @@ class GreenPlanetEnergyAPI:
         return highest_price, None
 
     def get_lowest_price_day_with_hour(
-        self, data: dict[str, float]
+        self, data: dict[str, float], current_hour: int | None = None
     ) -> tuple[float | None, int | None]:
         """Get the lowest day price and the hour when it occurs.
 
         Args:
             data: Price data dictionary with hourly prices
+            current_hour: Current hour (0-23). Passed through to
+                :meth:`get_lowest_price_day` to switch to tomorrow's data when
+                the day period (06:00-18:00) has already passed.
 
         Returns:
             Tuple of (lowest_price, hour) or (None, None) if no data available
         """
-        lowest_price = self.get_lowest_price_day(data)
+        lowest_price = self.get_lowest_price_day(data, current_hour)
         if lowest_price is None or not data:
             return None, None
 
+        # Use the same suffix logic as get_lowest_price_day.
+        use_tomorrow = current_hour is not None and current_hour >= 18
+        suffix = "_tomorrow" if use_tomorrow else ""
+
         for hour in range(6, 18):  # Day period: 6:00 to 18:00
-            price_key = f"gpe_price_{hour:02d}"
+            price_key = f"gpe_price_{hour:02d}{suffix}"
             if data.get(price_key) == lowest_price:
                 return lowest_price, hour
 
